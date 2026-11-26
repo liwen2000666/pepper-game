@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablet check</title>
+<!-- Plain ES5 + basic CSS on purpose: this page must work on Pepper's old tablet browser. -->
+<style>
+  body{margin:0;padding:24px 32px;background:#F3E3C3;color:#2B2238;font-family:sans-serif;font-size:20px}
+  h1{margin:0 0 4px;font-size:34px}
+  .sub{color:#6A5C70;margin:0 0 16px}
+  .summary{padding:14px 18px;border-radius:14px;border:3px solid #2B2238;margin:0 0 16px;font-weight:bold;font-size:24px}
+  .good{background:#DDEFD6}.bad{background:#F9DCD2}
+  table{border-collapse:collapse;width:100%;background:#FFFBF2;border:2px solid #2B2238}
+  td{padding:7px 12px;border-bottom:1px solid #E3CFA6;vertical-align:top}
+  td.r{width:70px;text-align:center;font-weight:bold}
+  .ok{color:#2A7342}.no{color:#B5392A}.info{color:#6A5C70}
+  .back{display:inline-block;margin-top:16px;padding:12px 22px;border-radius:30px;background:#E0533D;color:#fff;text-decoration:none;font-weight:bold}
+  .ua{font-family:monospace;font-size:14px;color:#6A5C70;word-break:break-all}
+</style>
+</head>
+<body>
+<h1>Pepper tablet check</h1>
+<p class="sub">Take a photo of this screen and send it to the developer.</p>
+<div id="summary" class="summary">Checking...</div>
+<table id="results"></table>
+<p class="ua" id="ua"></p>
+<a class="back" href="index.html?nocheck=1">Try the game anyway</a>
+
+<script src="/libs/qimessaging/2/qimessaging.js"></script>
+<script>
+(function () {
+  var rows = [], blocking = 0;
+  function add(name, ok, needed, detail) {
+    rows.push([name, ok, needed, detail || '']);
+    if (needed && ok === false) blocking++;
+  }
+  function syntax(code) { try { new Function(code); return true; } catch (e) { return false; } }
+  function css(prop, value) {
+    var el = document.createElement('div');
+    try { el.style[prop] = value; } catch (e) {}
+    return el.style[prop] !== '' && el.style[prop] !== undefined;
+  }
+
+  var ua = navigator.userAgent, m = ua.match(/Chrome\/(\d+)/);
+  add('Browser version', m ? true : null, null, m ? 'Chrome ' + m[1] : 'unknown');
+  add('Screen size', true, null, screen.width + ' x ' + screen.height + ' (window ' + window.innerWidth + ' x ' + window.innerHeight + ')');
+
+  // JavaScript used by the game
+  add('let / const, arrow functions', syntax('const f = () => 1; let x = 2;'), true);
+  add('Template strings', syntax('var a = `x${1}`;'), true);
+  add('async / await', syntax('async function f(){ await 1; }'), true);
+  add('Object spread { ...a }', syntax('var a = {}; var b = { ...a };'), true);
+  add('Array.flatMap', typeof [].flatMap === 'function', true);
+  add('Promise', typeof Promise === 'function', true);
+
+  // CSS used by the layout
+  add('CSS variables', !!(window.CSS && CSS.supports && CSS.supports('--a', '0')), true);
+  add('CSS grid', css('display', 'grid'), true);
+  add('CSS inset', css('inset', '0px'), true);
+  var gap = false;
+  if (window.CSS && CSS.supports) gap = CSS.supports('gap', '1px');
+  add('Flexbox gap', gap, true, 'spacing between buttons');
+  add('backdrop-filter (blur)', !!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter', 'blur(2px)') || CSS.supports('-webkit-backdrop-filter', 'blur(2px)'))), false, 'optional, only looks');
+
+  // animation, sound, voice
+  var el = document.createElement('div');
+  add('Web Animations (jump)', typeof el.animate === 'function', true);
+  add('animation.finished', typeof el.animate === 'function' && (function () { try { return 'finished' in el.animate([{ opacity: 1 }, { opacity: 1 }], 1); } catch (e) { return false; } })(), true);
+  add('Sound effects (Web Audio)', !!(window.AudioContext || window.webkitAudioContext), false, 'optional');
+  add('Browser voice (speechSynthesis)', 'speechSynthesis' in window, false, 'not needed on the robot: Pepper speaks');
+  add('Fonts (woff2)', !!(window.FontFace), false);
+
+  // robot connection
+  var qi = typeof window.QiSession === 'function';
+  add('QiMessaging library', qi, false, qi ? 'found' : 'not found (normal on a computer)');
+
+  function render() {
+    var html = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i], mark = r[1] === true ? '<span class="ok">OK</span>' : r[1] === false ? '<span class="no">NO</span>' : '<span class="info">?</span>';
+      html += '<tr><td class="r">' + mark + '</td><td>' + r[0] + (r[2] === false ? ' <span class="info">(optional)</span>' : '') + '</td><td class="info">' + r[3] + '</td></tr>';
+    }
+    document.getElementById('results').innerHTML = html;
+    var s = document.getElementById('summary');
+    if (blocking === 0) { s.className = 'summary good'; s.innerHTML = 'All good: the game should run on this tablet.'; }
+    else { s.className = 'summary bad'; s.innerHTML = blocking + ' needed feature(s) missing: the game needs a compatible version for this tablet.'; }
+  }
+
+  document.getElementById('ua').innerHTML = ua.replace(/</g, '&lt;');
+  render();
+
+  if (qi) {
+    var t = setTimeout(function () { add('Connected to robot', false, false, 'no answer from NAOqi'); render(); }, 5000);
+    try {
+      var session = new QiSession();
+      session.service('ALSystem').done(function (sys) {
+        sys.robotName().done(function (name) {
+          sys.systemVersion().done(function (ver) {
+            clearTimeout(t); add('Connected to robot', true, false, name + ' (NAOqi ' + ver + ')'); render();
+          });
+        });
+      }).fail(function (e) { clearTimeout(t); add('Connected to robot', false, false, String(e)); render(); });
+    } catch (e) { clearTimeout(t); add('Connected to robot', false, false, String(e)); render(); }
+  }
+})();
+</script>
+</body>
+</html>

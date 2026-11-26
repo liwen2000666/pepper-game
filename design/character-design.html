@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pepper</title>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+/* Layout: one storybook page, a big hero with callouts, then poses, palette and rules.
+   Single deliberate look (parchment), so colours are set explicitly. */
+:root{
+  --paper:#FBF3E1; --paper-2:#F3E5C4; --card:#FFFBF2; --line:#E3CFA6;
+  --ink:#2B2238; --ink-soft:#6A5C70;
+  --purple:#7A57B8; --yellow:#F7D23E; --red:#E0473A; --orange:#F29A2E; --pink:#EBA3D6; --sky:#A9DAF3;
+  --font-read:'Andika','Nunito',system-ui,sans-serif;
+  --font-title:'Cinzel',Georgia,serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:400 17px/1.6 var(--font-read);-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1120px;margin:0 auto}
+header{padding-block:48px 8px;display:grid;gap:10px}
+.eyebrow{font:700 13px var(--font-read);letter-spacing:.2em;text-transform:uppercase;color:var(--purple)}
+h1{font:900 clamp(40px,6vw,64px)/1 var(--font-title);font-variant-ligatures:none;font-feature-settings:"liga" 0,"dlig" 0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--red)}
+.lede{max-width:720px;font-size:19px;color:var(--ink-soft)}
+h2{font:900 26px/1.2 var(--font-title);font-variant-ligatures:none;font-feature-settings:"liga" 0,"dlig" 0;margin-bottom:4px}
+section{margin-top:44px;display:grid;gap:16px}
+.sub{color:var(--ink-soft);max-width:760px}
+
+/* hero */
+.hero{background:var(--card);border:3px solid var(--ink);border-radius:28px;box-shadow:6px 6px 0 var(--ink);overflow-x:auto}
+.hero-box{position:relative;min-width:760px;aspect-ratio:900/560}
+.hero-box>svg{position:absolute;inset:0;width:100%;height:100%}
+.hero-box .back{z-index:0}.hero-box .front{z-index:2;pointer-events:none}
+.hero-box .pp{position:absolute;left:33.333%;top:12.5%;width:33.333%;height:71.43%;z-index:1}
+.callout-t{font:700 15px var(--font-read);fill:var(--ink)}
+.callout-s{font:400 13px var(--font-read);fill:var(--ink-soft)}
+.states{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px 18px;border-top:2px dashed var(--line)}
+.states button{font:700 15px var(--font-read);color:var(--ink);background:var(--paper);border:2.5px solid var(--ink);border-radius:99px;padding:7px 16px;cursor:pointer;box-shadow:0 3px 0 var(--ink);transition:transform .15s}
+.states button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.states button[aria-pressed="true"]{background:var(--yellow)}
+.states button:focus-visible{outline:3px solid var(--purple);outline-offset:3px}
+.state-note{flex-basis:100%;color:var(--ink-soft);font-size:15px;margin-top:4px}
+
+/* pose cards */
+.poses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:640px){.poses{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:1000px){.poses{grid-template-columns:repeat(7,minmax(0,1fr))}}
+.pose{background:var(--card);border:2.5px solid var(--ink);border-radius:20px;padding:12px 12px 14px;display:grid;gap:4px;min-width:0;box-shadow:4px 4px 0 var(--ink)}
+.pose .stage{position:relative;border-radius:14px;overflow:hidden}
+.pose .stage img{display:block;width:100%;height:auto;max-width:100%}
+.pose .pp{position:absolute;left:12%;top:6%;width:76%;height:92%}
+.pose b{font:700 17px var(--font-read)}
+.pose span{font-size:13.5px;color:var(--ink-soft);line-height:1.4}
+
+/* palette */
+.palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sw{background:var(--card);border:2.5px solid var(--ink);border-radius:16px;overflow:hidden;min-width:0}
+.sw i{display:block;height:58px;border-bottom:2.5px solid var(--ink)}
+.sw div{padding:8px 12px 10px;font-size:14px;line-height:1.35}
+.sw b{display:block;font-size:15px}
+.sw code{font:700 12.5px ui-monospace,Menlo,monospace;color:var(--ink-soft)}
+
+/* rules */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:2.5px solid var(--ink);border-radius:20px;padding:18px 20px;min-width:0}
+.card h3{font:700 19px var(--font-read);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.card h3 i{width:16px;height:16px;border-radius:50%;border:2.5px solid var(--ink);display:block}
+.card ul{padding-left:1.1em;display:grid;gap:6px;font-size:15.5px}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.check{background:var(--card);border:2.5px solid var(--ink);border-radius:20px;padding:14px;display:grid;gap:8px;min-width:0}
+.check .stage{height:190px;position:relative;display:grid;place-items:center;border-radius:12px;background:var(--paper-2)}
+.check .pp{position:relative;width:130px;height:173px}
+.check .pp.tiny{width:48px;height:64px}
+.check .pp.sil .pp-svg{filter:brightness(0)}
+.check b{font-size:16px}
+.check span{font-size:13.5px;color:var(--ink-soft)}
+footer{margin-top:40px;font-size:13.5px;color:var(--ink-soft)}
+
+/* ---------- Character states ---------- */
+.pp-svg{width:100%;height:100%;overflow:visible;display:block}
+.pp-svg *{transform-box:view-box}
+.k-root,.k-bounce,.k-sway{transform-origin:120px 300px}
+.k-head{transform-origin:120px 146px;transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
+.k-arm{transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
+.k-arm-l{transform-origin:84px 158px}.k-arm-r{transform-origin:156px 158px}
+.k-eye{transform-box:fill-box;transform-origin:center;transition:transform .07s}
+.blink .k-eye{transform:scaleY(.08)}
+.k-pupil{transition:transform .4s}
+.k-feather{transform-box:fill-box;transform-origin:100% 100%;animation:feather 2.8s ease-in-out infinite}
+@keyframes feather{50%{transform:rotate(5deg)}}
+.k-heart{transform-box:fill-box;transform-origin:center;animation:beat 1.6s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.18)}30%{transform:scale(1)}}
+.k-play,.k-pipe,.k-closed,.k-puff,.k-notes,.k-big,.k-flat,.k-wavy,.k-brow,.k-brow2,.k-q,.k-think{opacity:0}
+.k-play,.k-pipe,.k-closed,.k-puff,.k-notes,.k-big,.k-flat,.k-wavy,.k-brow,.k-brow2,.k-q,.k-think,.k-free,.k-eyes,.k-smile,.k-belt-pipe{transition:opacity .2s}
+.pp[data-state="idle"] .k-bounce,.pp[data-state="thinking"] .k-bounce{animation:breathe 3.4s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.014,.986)}}
+
+/* play the pipe (signature) + dance */
+.pp[data-state="play"] .k-free,.pp[data-state="dance"] .k-free,
+.pp[data-state="play"] .k-belt-pipe,.pp[data-state="dance"] .k-belt-pipe,
+.pp[data-state="play"] .k-eyes,.pp[data-state="dance"] .k-eyes,
+.pp[data-state="play"] .k-smile,.pp[data-state="dance"] .k-smile{opacity:0}
+.pp[data-state="play"] .k-play,.pp[data-state="dance"] .k-play,
+.pp[data-state="play"] .k-pipe,.pp[data-state="dance"] .k-pipe,
+.pp[data-state="play"] .k-closed,.pp[data-state="dance"] .k-closed,
+.pp[data-state="play"] .k-puff,.pp[data-state="dance"] .k-puff,
+.pp[data-state="play"] .k-notes,.pp[data-state="dance"] .k-notes{opacity:1}
+.pp[data-state="play"] .k-sway{animation:tap 1.2s ease-in-out infinite}
+@keyframes tap{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+.pp[data-state="dance"] .k-sway{animation:sway .46s ease-in-out infinite alternate}
+.pp[data-state="dance"] .k-bounce{animation:hop .46s ease-in-out infinite}
+@keyframes sway{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.k-notes g{transform-box:fill-box;transform-origin:center;animation:note 1.4s ease-in-out infinite}
+.k-notes g:nth-child(2){animation-delay:.45s}.k-notes g:nth-child(3){animation-delay:.9s}
+@keyframes note{0%{transform:translate(0,8px);opacity:0}30%{opacity:1}100%{transform:translate(8px,-18px);opacity:0}}
+
+/* happy (correct answer) */
+.pp[data-state="happy"] .k-eyes{opacity:0}.pp[data-state="happy"] .k-closed{opacity:1}
+.pp[data-state="happy"] .k-smile{opacity:0}.pp[data-state="happy"] .k-big{opacity:1}
+.pp[data-state="happy"] .k-arm-l{transform:rotate(115deg)}.pp[data-state="happy"] .k-arm-r{transform:rotate(-115deg)}
+.pp[data-state="happy"] .k-bounce{animation:hop .55s ease-out infinite}
+/* thinking (new question) */
+.pp[data-state="thinking"] .k-head{transform:rotate(7deg)}
+.pp[data-state="thinking"] .k-smile{opacity:0}.pp[data-state="thinking"] .k-flat{opacity:1}
+.pp[data-state="thinking"] .k-think,.pp[data-state="thinking"] .k-brow2{opacity:1}
+.pp[data-state="thinking"] .k-pupil{transform:translate(3px,-4px)}
+.k-think circle{transform-box:fill-box;transform-origin:center;animation:dot 1.4s ease-in-out infinite}
+.k-think circle:nth-child(2){animation-delay:.18s}.k-think circle:nth-child(3){animation-delay:.36s}
+@keyframes dot{0%,100%{transform:scale(.7);opacity:.5}50%{transform:scale(1);opacity:1}}
+/* curious (try again: never sad) */
+.pp[data-state="curious"] .k-head{transform:rotate(-10deg)}
+.pp[data-state="curious"] .k-brow,.pp[data-state="curious"] .k-q,.pp[data-state="curious"] .k-wavy{opacity:1}
+.pp[data-state="curious"] .k-smile{opacity:0}
+.pp[data-state="curious"] .k-pupil{transform:translate(-2px,1px)}
+.pp[data-state="curious"] .k-arm-l{transform:rotate(40deg)}.pp[data-state="curious"] .k-arm-r{transform:rotate(-40deg)}
+.k-q text{transform-box:fill-box;transform-origin:center;animation:qf 1.6s ease-in-out infinite}
+@keyframes qf{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-6px) rotate(8deg)}}
+/* wave (greeting) */
+.pp[data-state="wave"] .k-eyes{opacity:0}.pp[data-state="wave"] .k-closed{opacity:1}
+.pp[data-state="wave"] .k-arm-r{animation:waveR .5s ease-in-out infinite alternate}
+@keyframes waveR{from{transform:rotate(-122deg)}to{transform:rotate(-98deg)}}
+.k-ring{transition:stroke .4s}
+
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <linearGradient id="kBody" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E4DDD6"/><stop offset=".35" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DCD3CA"/></linearGradient>
+  <radialGradient id="kHead" cx=".38" cy=".3" r=".78"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".72" stop-color="#F8F5F1"/><stop offset="1" stop-color="#E2D9CF"/></radialGradient>
+  <radialGradient id="kEye" cx=".45" cy=".36" r=".66"><stop offset="0" stop-color="#5D7EEA"/><stop offset=".55" stop-color="#2F3E96"/><stop offset="1" stop-color="#191F50"/></radialGradient>
+</defs></svg>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Character design · v3.4</div>
+  <h1>Pepper</h1>
+  <p class="lede">The robot children meet in class, dressed for a story. Pepper keeps its round white head, big eyes and chest screen, so children connect the drawing with the real robot standing beside them. The Piper costume adds the fairy-tale: a feathered cap, a pied tunic, a scalloped cape and a shawm pipe with a flared bell.</p>
+</header>
+
+<section aria-labelledby="h-hero">
+  <h2 id="h-hero">Signature pose: playing the pipe</h2>
+  <div class="hero">
+    <div class="hero-box">
+      <svg class="back" viewBox="0 0 900 560" aria-hidden="true"><circle cx="450" cy="300" r="212" fill="#A9DAF3" stroke="#2B2238" stroke-width="3"/><ellipse cx="450" cy="508" rx="120" ry="12" fill="rgba(43,34,56,.15)"/></svg>
+      <div class="pp" id="heroPP" data-state="play"></div>
+      <svg class="front" id="callouts" viewBox="0 0 900 560" aria-hidden="true"></svg>
+    </div>
+    <div class="states" role="group" aria-label="Show a pose">
+      <button data-s="play" aria-pressed="true">Play the pipe</button>
+      <button data-s="idle" aria-pressed="false">Idle</button>
+      <button data-s="thinking" aria-pressed="false">Thinking</button>
+      <button data-s="happy" aria-pressed="false">Happy</button>
+      <button data-s="curious" aria-pressed="false">Curious</button>
+      <button data-s="dance" aria-pressed="false">Dance</button>
+      <button data-s="wave" aria-pressed="false">Wave</button>
+      <p class="state-note" id="stateNote"></p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-poses">
+  <h2 id="h-poses">Poses and when the game uses them</h2>
+  <p class="sub"><b>Each card is an animated GIF:</b> right-click it and choose "Save image", or drag it straight into PowerPoint. It keeps moving in the slideshow.</p>
+  <p class="sub">Every pose is cheerful or curious. Pepper is never sad, angry or crying, and there is no "wrong" face: a mistake gets the curious pose and an invitation to try again together.</p>
+  <div class="poses" id="poses"></div>
+</section>
+
+<section aria-labelledby="h-pal">
+  <h2 id="h-pal">Colour palette</h2>
+  <p class="sub">Flat colours with one dark outline, like a picture book. The robot stays white; the costume carries the colour.</p>
+  <div class="palette" id="palette"></div>
+</section>
+
+<section aria-labelledby="h-rules">
+  <h2 id="h-rules">Design rules</h2>
+  <div class="cols">
+    <div class="card"><h3><i style="background:#fff"></i>Keep it Pepper</h3><ul>
+      <li>Pepper's own head outline: dome top, ears bulging out at the sides, softer chin</li>
+      <li>Small, simple smile</li>
+      <li>No eyebrows at rest (the real robot has none); they appear only when thinking or curious</li>
+      <li>Big round eyes with a blue ring</li>
+      <li>Chest screen always visible (arms and pipe never cover it)</li>
+      <li>White bell-shaped base on wheels; no legs</li>
+      <li>Robot-white round hands</li>
+    </ul></div>
+    <div class="card"><h3><i style="background:var(--purple)"></i>The Piper costume</h3><ul>
+      <li>Orange cap with a red band and a long pink feather</li>
+      <li>Pied tunic: purple left half, yellow right half</li>
+      <li>Red sleeves, so the arms read clearly against the tunic</li>
+      <li>Yellow scalloped cape with a white lining</li>
+      <li>Brown belt with pouch; curled red toes peeking out under the base</li>
+      <li>Shawm-style pipe: conical wooden body ending in a flared brass bell; played in the signature pose, tucked in the belt otherwise</li>
+    </ul></div>
+    <div class="card"><h3><i style="background:var(--red)"></i>Avoid</h3><ul>
+      <li>Sad, angry or crying expressions</li>
+      <li>Pure black outlines; use deep plum <code>#2B2238</code></li>
+      <li>Covering the eyes or the screen with costume pieces</li>
+      <li>Rats or crowds of children from the original tale</li>
+    </ul></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-checks">
+  <h2 id="h-checks">Readability checks</h2>
+  <div class="checks">
+    <div class="check"><div class="stage"><div class="pp sil" data-state="play"></div></div><b>Silhouette</b><span>Cap, feather, pipe and cape make the shape recognisable even in solid black.</span></div>
+    <div class="check"><div class="stage"><div class="pp tiny" data-state="idle"></div></div><b>Small size (64 px)</b><span>Eyes, cap and the purple/yellow split still read at the size used for icons.</span></div>
+    <div class="check"><div class="stage" style="background:#2B2238"><div class="pp" data-state="happy"></div></div><b>On a dark ground</b><span>The plum outline keeps the white robot separate from any background.</span></div>
+  </div>
+</section>
+
+<footer>Original character design for the Pepper classroom game. Inspired by the public-domain Pied Piper folk tale and storybook illustration in general; it does not reproduce any existing artwork.</footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+const O = '#2B2238';             // outline
+const C = { purple:'#7A57B8', yellow:'#F7D23E', red:'#E0473A', orange:'#F29A2E', pink:'#EBA3D6', wood:'#B07A45', brass:'#F2B630', leather:'#7A4A2A', lining:'#FFF6DF' };
+
+function scallops(x0, x1, y, n, depth, fillL, fillR){
+  const w = (x1 - x0) / n, mid = (x0 + x1) / 2;
+  let s = '';
+  for (let i = 0; i < n; i++){
+    const x = x0 + i * w;
+    s += `<path d="M${x} ${y}h${w}v4q${-w / 2} ${depth * 2} ${-w} 0z" fill="${x + w / 2 < mid ? fillL : fillR}" stroke="${O}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  }
+  return s;
+}
+function capeWing(side){
+  // scalloped outer edge from shoulder down to the hem
+  const m = side === 'l' ? 1 : -1, cx = 120;
+  const X = x => cx - m * (cx - x);
+  const pts = [[84,148],[56,166],[36,200],[24,248]];
+  let d = `M${X(pts[0][0])} ${pts[0][1]}C${X(56)} 160 ${X(34)} 196 ${X(24)} 250`;
+  const bumps = [[24,250],[40,260],[56,262],[72,258],[88,250]];
+  for (let i = 1; i < bumps.length; i++) d += `Q${X((bumps[i-1][0] + bumps[i][0]) / 2)} ${Math.max(bumps[i-1][1], bumps[i][1]) + 12} ${X(bumps[i][0])} ${bumps[i][1]}`;
+  d += `L${X(100)} 170Z`;
+  return d;
+}
+function piperSVG(){
+  const eye = (cx) => `<g class="k-eyes"><g class="k-eye"><circle cx="${cx}" cy="96" r="19" fill="#EEF1F6" stroke="${O}" stroke-width="2.5"/>
+      <circle class="k-ring" cx="${cx}" cy="96" r="15.5" fill="none" stroke="#9FD8F7" stroke-width="3.2"/>
+      <circle cx="${cx}" cy="96" r="12.5" fill="url(#kEye)"/>
+      <g class="k-pupil"><circle cx="${cx + 4}" cy="91" r="4.4" fill="#fff"/><circle cx="${cx - 4.5}" cy="101.5" r="2.1" fill="#fff" opacity=".85"/></g></g></g>`;
+  const sleeve = (d, col) => `<path d="${d}" stroke="${O}" stroke-width="21" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="${d}" stroke="${col}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+  const hand = (x, y) => `<circle cx="${x}" cy="${y}" r="10.5" fill="#fff" stroke="${O}" stroke-width="2.8"/>`;
+  const note = (x, y, c) => `<g><circle cx="${x}" cy="${y}" r="5.5" fill="${c}" stroke="${O}" stroke-width="2"/><path d="M${x + 5} ${y}v-18l10 4" stroke="${O}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+  return `<svg class="pp-svg" viewBox="0 0 240 320" aria-hidden="true">
+  <g class="k-root"><g class="k-bounce"><g class="k-sway">
+    <!-- cape: yellow scalloped wings, white lining on the right -->
+    <path d="${capeWing('l')}" fill="${C.yellow}" stroke="${O}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="${capeWing('r')}" fill="${C.yellow}" stroke="${O}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M152 150c22 16 34 52 38 96l-16 6-26-90z" fill="${C.lining}" stroke="${O}" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M88 150c-22 16-34 52-38 96l16 6 26-90z" fill="${C.lining}" stroke="${O}" stroke-width="2.2" stroke-linejoin="round"/>
+    <!-- base + curled toes -->
+    <path d="M77 292c-14 3-26-1-31-10 7 3 12 1 14-4 5 9 11 11 19 9z" fill="${C.red}" stroke="${O}" stroke-width="2.8" stroke-linejoin="round"/>
+    <path d="M163 292c14 3 26-1 31-10-7 3-12 1-14-4-5 9-11 11-19 9z" fill="${C.red}" stroke="${O}" stroke-width="2.8" stroke-linejoin="round"/>
+    <path d="M86 224c-4 30-12 54-20 68q54 16 108 0c-8-14-16-38-20-68z" fill="url(#kBody)" stroke="${O}" stroke-width="3"/>
+    <path d="M68 288q52 15 104 0l2 6q-54 17-108 0z" fill="#9A8E86" stroke="${O}" stroke-width="2"/>
+    <!-- free arms (idle, happy, thinking, curious, wave) -->
+    <g class="k-free">
+      <g class="k-arm k-arm-l">${sleeve('M84 158C70 172 64 192 64 210', C.red)}${hand(64, 216)}</g>
+      <g class="k-arm k-arm-r">${sleeve('M156 158c14 14 20 34 20 52', C.red)}${hand(176, 216)}</g>
+    </g>
+    <!-- pied tunic -->
+    <path d="M120 140h-12a30 30 0 0 0-30 30v30a30 30 0 0 0 30 30h12z" fill="${C.purple}" stroke="${O}" stroke-width="3"/>
+    <path d="M120 140h12a30 30 0 0 1 30 30v30a30 30 0 0 1-30 30h-12z" fill="${C.yellow}" stroke="${O}" stroke-width="3"/>
+    ${scallops(76, 164, 222, 8, 6, C.purple, C.yellow)}
+    <!-- chest screen (real Pepper) -->
+    <rect x="100" y="170" width="40" height="32" rx="7" fill="#2E3558" stroke="${O}" stroke-width="3"/>
+    <rect x="100" y="170" width="40" height="32" rx="7" fill="none" stroke="${C.brass}" stroke-width="1.5" transform="translate(0 0)" opacity=".9"/>
+    <path class="k-heart" d="M120 195c-7-5-10.5-8.3-10.5-12.2a4.9 4.9 0 0 1 10.5-2.1 4.9 4.9 0 0 1 10.5 2.1c0 3.9-3.5 7.2-10.5 12.2z" fill="${C.red}"/>
+    <!-- belt, pouch, tucked pipe -->
+    <rect x="78" y="208" width="84" height="10" rx="4" fill="${C.leather}" stroke="${O}" stroke-width="2.5"/>
+    <rect x="114" y="206" width="13" height="14" rx="3" fill="${C.brass}" stroke="${O}" stroke-width="2.5"/>
+    <path d="M84 216h20v18a6 6 0 0 1-6 6h-8a6 6 0 0 1-6-6z" fill="#9A6234" stroke="${O}" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M84 216h20l-3 10h-14z" fill="${C.leather}" stroke="${O}" stroke-width="2.2" stroke-linejoin="round"/><circle cx="94" cy="225" r="2" fill="${C.brass}"/>
+    <g class="k-belt-pipe" stroke="${O}" stroke-width="2.2" stroke-linejoin="round">
+      <path d="M147.9 196.4L177.9 228.6L171.1 234.4L144.1 199.6z" fill="${C.wood}"/>
+      <path d="M177.9 228.6Q180.8 232.7 188.6 232.6L173.4 245.6Q174.8 237.9 171.1 234.4z" fill="${C.brass}"/>
+      <ellipse cx="181" cy="239.1" rx="10" ry="2.8" transform="rotate(139.6 181 239.1)" fill="#7A4A1C"/>
+    </g>
+    <!-- red collar -->
+    <path d="M90 140q7 11 15 0 7 11 15 0 7 11 15 0 7 11 15 0v-5H90z" fill="${C.red}" stroke="${O}" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- head: real Pepper face shape (rounded top, widest at the eyes, softer chin) -->
+    <g class="k-head">
+      <path d="M120 26C150 26 172 38 180 60c4 8 6 12 8 16 8 4 10 28 2 36-4 4-8 6-10 8-8 18-30 34-60 34s-52-16-60-34c-2-2-6-4-10-8-8-8-6-32 2-36 2-4 4-8 8-16C68 38 90 26 120 26z" fill="url(#kHead)" stroke="${O}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M187 82c5 8 5 20 1 27M53 82c-5 8-5 20-1 27" fill="none" stroke="#D3C6B8" stroke-width="2" stroke-linecap="round"/>
+      <path d="M80 44c10-6 22-9 34-9" stroke="#fff" stroke-width="5" opacity=".8" fill="none" stroke-linecap="round"/>
+      <path class="k-brow2" d="M80 66q10-8 21-4M160 66q-10-8-21-4" stroke="${O}" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <path class="k-brow" d="M78 66q11-7 22-3M140 61q11-4 21 5" stroke="${O}" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      ${eye(96)}${eye(144)}
+      <g class="k-closed"><path d="M81 99q15-17 30 0M129 99q15-17 30 0" stroke="${O}" stroke-width="6" fill="none" stroke-linecap="round"/></g>
+      <ellipse cx="74" cy="124" rx="9" ry="5" fill="#F49AAA" opacity=".45"/><ellipse cx="166" cy="124" rx="9" ry="5" fill="#F49AAA" opacity=".45"/>
+      <g class="k-puff"><circle cx="109" cy="129" r="7.5" fill="#F7B3BF" stroke="${O}" stroke-width="2"/><circle cx="133" cy="129" r="7.5" fill="#F7B3BF" stroke="${O}" stroke-width="2"/></g>
+      <path class="k-smile" d="M111 126q9 9 18 0q-9 3.5-18 0z" fill="${O}" stroke="${O}" stroke-width="2" stroke-linejoin="round"/>
+      <g class="k-big"><path d="M107 123q13 17 26 0z" fill="${O}" stroke="${O}" stroke-width="2" stroke-linejoin="round"/><path d="M114 131q6-4 12 0-6 4-12 0z" fill="#F07C8C"/></g>
+      <path class="k-flat" d="M113 129q7 1.5 14 0" stroke="${O}" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path class="k-wavy" d="M108 129q4-5 8 0t8 0 8 0" stroke="${O}" stroke-width="3.8" fill="none" stroke-linecap="round"/>
+      <!-- cap perched on top of the dome -->
+      <g class="k-feather">
+        <path d="M92 26C66 0 34-8 6 0c22 6 48 20 80 34z" fill="${C.pink}" stroke="${O}" stroke-width="2.8" stroke-linejoin="round"/>
+        <path d="M86 30C64 12 40 4 16 1" stroke="${O}" stroke-width="1.6" fill="none" opacity=".7"/>
+        <path d="M30-1l-4 8M46 2l-3 10M62 8l-2 10" stroke="${O}" stroke-width="1.3" opacity=".5"/>
+      </g>
+      <path d="M80 30C82 2 116-10 150 2c12 5 18 14 18 26z" fill="${C.orange}" stroke="${O}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M100 4c11-6 26-7 38-3" stroke="#fff" stroke-width="5" opacity=".35" fill="none" stroke-linecap="round"/>
+      <path d="M74 33c32-11 70-11 98-2l-2 9c-30-9-64-9-94 2z" fill="${C.red}" stroke="${O}" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="90" cy="33" r="5" fill="${C.brass}" stroke="${O}" stroke-width="2.2"/>
+    </g>
+    <!-- playing: pipe at the mouth, both hands on it below the chin -->
+    <!-- shawm: conical wooden body, brass ring, flared brass bell -->
+    <g class="k-pipe" stroke="${O}" stroke-width="2.5" stroke-linejoin="round">
+      <path d="M122.7 125.5L206.7 179.9L200.5 188.9L119.3 130.5z" fill="${C.wood}"/>
+      <path d="M126 128L198 177" stroke="#D29A62" stroke-width="2" opacity=".8" fill="none"/>
+      <path d="M206.7 179.9Q216.9 186.2 232.4 184.7L214.4 211.1Q210.1 196.2 200.5 188.9z" fill="${C.brass}"/>
+      <ellipse cx="223.4" cy="197.9" rx="16" ry="4.2" transform="rotate(124.3 223.4 197.9)" fill="#7A4A1C"/>
+      <path d="M199.9 189.8L207.3 179" stroke-width="5" stroke="${O}"/><path d="M199.9 189.8L207.3 179" stroke-width="2.6" stroke="#FBE7B0"/>
+      <path d="M117 125.8L125 131.3" stroke-width="5" stroke="#5A3418"/>
+      <g fill="#3A2418" stroke="none"><circle cx="154" cy="150.6" r="2"/><circle cx="166.4" cy="159" r="2"/><circle cx="178.8" cy="167.5" r="2"/></g>
+    </g>
+    <g class="k-play">
+      ${sleeve('M84 160C108 172 138 168 157 158', C.red)}${hand(160, 155)}
+      ${sleeve('M157 162C174 182 190 190 189 179', C.red)}${hand(188, 175)}
+    </g>
+  </g></g></g>
+  <g class="k-notes">${note(240, 166, C.yellow)}${note(226, 140, C.pink)}${note(246, 116, C.purple)}</g>
+  <g class="k-think" fill="#BFE1F5" stroke="${O}" stroke-width="2"><circle cx="186" cy="40" r="5"/><circle cx="200" cy="25" r="7"/><circle cx="218" cy="8" r="9.5"/></g>
+  <g class="k-q"><text x="186" y="76" font-family="Andika, sans-serif" font-weight="700" font-size="46" fill="${C.purple}" stroke="${O}" stroke-width="2">?</text></g>
+</svg>`;
+}
+
+// render every character slot
+const POSES = [
+  { s: 'play', name: 'Play the pipe', when: 'Signature pose. Title screen and while Pepper hops to the next square.' },
+  { s: 'idle', name: 'Idle', when: 'Waiting for the team to answer. Breathes and blinks.' },
+  { s: 'thinking', name: 'Thinking', when: 'A new question appears, or the timer runs out.' },
+  { s: 'happy', name: 'Happy', when: 'Correct answer. Arms up, big smile.' },
+  { s: 'curious', name: 'Curious', when: 'Not quite right. Head tilt and a question mark: "Let\'s try again together!"' },
+  { s: 'dance', name: 'Dance', when: 'Goose square and the finish: plays the pipe and dances.' },
+  { s: 'wave', name: 'Wave', when: 'Greeting the children at the start.' }
+];
+document.getElementById('poses').innerHTML = POSES.map(p => `
+  <figure class="pose"><div class="stage"><img src="pepper-gifs/illustration/pepper-${p.s}.gif" alt="Pepper, ${p.name} pose (animated)" width="440" height="480" loading="lazy"></div>
+    <b>${p.name}</b><span>${p.when}</span>
+</figure>`).join('');
+document.querySelectorAll('.pp').forEach(el => { el.innerHTML = piperSVG(); });
+
+// hero state switcher
+const hero = document.getElementById('heroPP'), note = document.getElementById('stateNote');
+function setHero(s){
+  hero.dataset.state = s;
+  document.querySelectorAll('.states button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === s)));
+  const p = POSES.find(p => p.s === s); note.textContent = p ? p.when : '';
+}
+document.querySelectorAll('.states button').forEach(b => b.addEventListener('click', () => setHero(b.dataset.s)));
+setHero('play');
+
+// callouts: character coords (240×320 viewBox) → hero box (900×560)
+const X = x => 300 + 1.25 * x, Y = y => 70 + 1.25 * y;
+const CALL = [
+  { x: 30, y: 2, side: 'l', ly: 92, t: 'Pink feather', s: 'swishes as Pepper moves' },
+  { x: 132, y: 6, side: 'r', ly: 86, t: 'Piper cap', s: 'orange with a red band' },
+  { x: 80, y: 92, side: 'l', ly: 178, t: 'Big round eyes', s: 'blue ring, like the real robot' },
+  { x: 46, y: 96, side: 'l', ly: 238, t: "Pepper's head outline", s: 'dome top, ears bulge out, softer chin' },
+  { x: 238, y: 206, side: 'r', ly: 176, t: 'Shawm pipe', s: 'wooden body, flared brass bell' },
+  { x: 176, y: 178, side: 'r', ly: 236, t: 'Red sleeves', s: 'hands stay robot-white' },
+  { x: 126, y: 196, side: 'r', ly: 306, t: 'Chest screen', s: 'always visible' },
+  { x: 96, y: 188, side: 'l', ly: 300, t: 'Pied tunic', s: 'purple + yellow halves' },
+  { x: 30, y: 230, side: 'l', ly: 380, t: 'Scalloped cape', s: 'yellow with white lining' },
+  { x: 94, y: 236, side: 'l', ly: 452, t: 'Belt and pouch', s: 'pipe tucks in when not playing' },
+  { x: 186, y: 286, side: 'r', ly: 440, t: 'Curled toes', s: 'peek out under the white base' }
+];
+document.getElementById('callouts').innerHTML = CALL.map(c => {
+  const ax = X(c.x), ay = Y(c.y), lx = c.side === 'l' ? 262 : 638;
+  const tx = c.side === 'l' ? 254 : 646, anchor = c.side === 'l' ? 'end' : 'start';
+  return `<path d="M${ax} ${ay}L${lx} ${c.ly}" stroke="#2B2238" stroke-width="1.6" stroke-dasharray="4 4" fill="none"/>
+    <circle cx="${ax}" cy="${ay}" r="5" fill="#fff" stroke="#2B2238" stroke-width="2.5"/>
+    <text class="callout-t" x="${tx}" y="${c.ly - 2}" text-anchor="${anchor}">${c.t}</text>
+    <text class="callout-s" x="${tx}" y="${c.ly + 16}" text-anchor="${anchor}">${c.s}</text>`;
+}).join('');
+
+// palette
+const PAL = [
+  ['Robot ivory', '#F7F3EE', 'head, body, hands'], ['Outline plum', '#2B2238', 'every outline'],
+  ['Tunic purple', '#7A57B8', 'left half of tunic'], ['Tunic yellow', '#F7D23E', 'right half, cape'],
+  ['Sleeve red', '#E0473A', 'sleeves, collar, cap band, toes'], ['Cap orange', '#F29A2E', 'cap'],
+  ['Feather pink', '#EBA3D6', 'feather'], ['Pipe wood', '#B07A45', 'pipe, pouch'],
+  ['Brass', '#F2B630', 'buckle, pipe bell'], ['Eye ring', '#9FD8F7', 'eye rings'], ['Eye iris', '#2F3E96', 'iris (blue gradient)'],
+  ['Backdrop sky', '#A9DAF3', 'circle behind Pepper']
+];
+document.getElementById('palette').innerHTML = PAL.map(([n, h, r]) =>
+  `<div class="sw"><i style="background:${h}"></i><div><b>${n}</b><code>${h}</code><br>${r}</div></div>`).join('');
+
+// blinking
+const blink = () => { document.querySelectorAll('.pp-svg').forEach(s => s.classList.add('blink')); setTimeout(() => document.querySelectorAll('.pp-svg').forEach(s => s.classList.remove('blink')), 130); };
+(function loop(){ setTimeout(() => { blink(); if (Math.random() < .25) setTimeout(blink, 260); loop(); }, 2200 + Math.random() * 3000); })();
+})();
+</script>
+</body>
+</html>
