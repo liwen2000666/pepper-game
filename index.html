@@ -355,6 +355,9 @@ button:focus-visible{outline:4px solid var(--gold-deep);outline-offset:4px}
 .read-btn.speaking .wave2{animation-delay:.2s}
 @keyframes wv{50%{opacity:.25}}
 .qtext{flex:1;min-width:0}
+.qcard{position:relative}
+.heard-live{position:absolute;left:200px;bottom:7px;font:700 15px var(--font-body);color:#2F7FC1;opacity:0;transition:opacity .25s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.heard-live.on{opacity:1}
 .qlabel{font:700 13px var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--coral-deep);margin-bottom:4px}
 .qprompt{font:700 38px/1.12 var(--font-display);color:var(--ink)}
 .blank{display:inline-block;width:96px;height:.9em;margin:0 6px;border-bottom:5px dashed var(--lilac);vertical-align:-2px}
@@ -647,6 +650,7 @@ kbd{font:700 11.5px var(--font-ui);padding:2px 7px;border-radius:6px;background:
       <div class="qtext">
         <div class="qlabel" id="qLabel">Question 1</div>
         <div class="qprompt" id="qPrompt"></div>
+        <div class="heard-live" id="heardLive" aria-live="polite"></div>
       </div>
       <div class="qimg" id="qImg"></div>
       <div class="timer hidden" id="timer" aria-hidden="true">
@@ -754,6 +758,7 @@ kbd{font:700 11.5px var(--font-ui);padding:2px 7px;border-radius:6px;background:
       <label class="d-toggle"><div>Sound effects</div><span class="switch"><input type="checkbox" id="tSfx"><span></span></span></label>
       <label class="d-toggle"><div>Pepper's voice<small>Browser speech, or Pepper's TTS via hook</small></div><span class="switch"><input type="checkbox" id="tVoice"><span></span></span></label>
       <label class="d-toggle"><div>Read questions automatically</div><span class="switch"><input type="checkbox" id="tAuto"><span></span></span></label>
+      <label class="d-toggle"><div>Listen automatically<small>Mic opens after Pepper speaks (Chrome / Edge)</small></div><span class="switch"><input type="checkbox" id="tListen"><span></span></span></label>
     </div>
 
     <div class="d-sec">
@@ -1027,7 +1032,7 @@ function emit(name, ...args){
 /* ===================================================================
    3. STATE
 =================================================================== */
-const DEFAULTS = { sfx: true, voice: true, autoRead: true, timer: 0, bank: Object.keys(BANKS)[0] };
+const DEFAULTS = { sfx: true, voice: true, autoRead: true, autoListen: true, timer: 0, bank: Object.keys(BANKS)[0] };
 function loadSettings(){
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('pcq-settings-v2') || '{}') }; }
   catch (e) { return { ...DEFAULTS }; }
@@ -1919,67 +1924,191 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const canListen = q => !!q && q.type !== 'build' && (q.voice || !!SR || typeof PepperHooks.onListen === 'function');
 const vocabFor = q => lettersOf(q).flatMap(l => [q.options[l].label, ...(q.options[l].say || [])]).filter(Boolean);
 const Listen = {
-  rec: null,
-  start(){
+  rec: null, held: false, muted: false, denied: false, timer: 0,
+  /** auto=true: started by the game (after Pepper speaks); false: the mic button / M key. */
+  start(auto = false){
     const q = current();
     if (!canListen(q) || state.phase !== 'question') return;
     if (typeof PepperHooks.onListen === 'function'){
-      emit('onListen', vocabFor(q)); this.ui(true); setTimeout(() => this.ui(false), 6000); return;
+      if (this.rec) return;
+      this.rec = 'robot'; emit('onListen', vocabFor(q)); this.ui(true);
+      setTimeout(() => { if (this.rec === 'robot'){ this.rec = null; this.ui(false); } }, 6500); return;
     }
-    if (!SR){ const l = 'Say it out loud, then tap the letter!'; Bubble.show(l); Voice.say(l); return; }
-    this.stop(); Voice.stop();
+    if (!SR){ if (!auto){ const l = 'Say it out loud, then tap the letter!'; Bubble.show(l); Voice.say(l); } return; }
+    if (this.rec){ if (!auto){ this.muted = true; this.stop(); } return; }   // tapping while listening = stop
+    if (auto && (this.muted || this.denied || !state.settings.autoListen)) return;
+    if (!auto){ this.muted = false; Voice.stop(); }
+    const tk = state.token;
     try {
-      const r = new SR(); let done = false;
-      r.lang = 'en-US'; r.maxAlternatives = 5; r.interimResults = false;
-      r.onresult = e => { done = true; heard(Array.from(e.results[0]).map(a => a.transcript)); };
-      r.onerror = e => {
-        if (['not-allowed', 'service-not-allowed', 'network', 'audio-capture'].includes(e.error)){
-          done = true; const l = "I can't use the microphone here. Tap a letter instead!"; Bubble.show(l); Voice.say(l);
-        }
+      const r = new SR(); let done = false, last = [];
+      r.lang = 'en-US'; r.maxAlternatives = 5; r.interimResults = true; r.continuous = false;
+      r.onresult = e => {
+        if (done) return;
+        const alts = [];
+        for (let i = 0; i < e.results.length; i++) for (const a of Array.from(e.results[i])) alts.push(a.transcript);
+        last = alts; this.live(alts[0]);
+        const final = Array.from(e.results).some(x => x.isFinal);
+        const m = matchSpoken(q, alts);
+        if (m.letter && (final || m.score >= 1)){        // sure match: answer right away, even mid-sentence
+          done = true; this.rec = null; try { r.abort(); } catch (err) {}
+          this.ui(false); accept(q, m.letter);
+        } else if (final){ done = true; notHeard(alts[0], m.tie); }
       };
-      r.onend = () => { this.ui(false); this.rec = null; if (!done && state.phase === 'question') notHeard(); };
+      r.onerror = e => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+          done = true; this.denied = true;
+          const l = 'Please allow the microphone in the browser, or tap a letter!'; Bubble.show(l); Voice.say(l);
+        } else if (e.error === 'network'){
+          done = true; this.denied = true;
+          const l = 'Voice answers need the internet. Tap a letter instead!'; Bubble.show(l); Voice.say(l);
+        } else if (e.error === 'audio-capture'){
+          done = true; this.denied = true;
+          const l = "I can't find a microphone. Tap a letter instead!"; Bubble.show(l); Voice.say(l);
+        }                                                 // 'no-speech' / 'aborted': just listen again
+      };
+      r.onend = () => {
+        if (this.rec === r) this.rec = null;
+        this.ui(false);
+        if (done || tk !== state.token || state.phase !== 'question') return;
+        if (last.length) notHeard(last[0]);               // heard something, matched nothing
+        else this.soon(300);                              // silence: keep listening quietly
+      };
       this.rec = r; r.start(); this.ui(true);
-    } catch (e) { this.ui(false); }
+      if (!auto) this.live('');
+    } catch (e) { this.rec = null; this.ui(false); }
   },
+  /** Listen again shortly, unless Pepper is talking. */
+  soon(ms = 450){
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      if (this.held || (window.speechSynthesis && speechSynthesis.speaking)) return;
+      this.start(true);
+    }, ms);
+  },
+  hold(){ this.held = true; clearTimeout(this.timer); if (this.rec && this.rec !== 'robot') this.stop(); },
+  release(){ this.held = false; this.soon(); },
   stop(){
-    if (this.rec){ try { this.rec.onend = null; this.rec.abort(); } catch (e) {} this.rec = null; }
+    clearTimeout(this.timer);
+    if (this.rec && this.rec !== 'robot'){ const r = this.rec; this.rec = null; try { r.onend = null; r.abort(); } catch (e) {} }
     this.ui(false);
   },
-  ui(on){ $('#micBtn').classList.toggle('listening', on); }
+  newQuestion(){ this.muted = false; this.stop(); this.live(null); },
+  ui(on){ $('#micBtn').classList.toggle('listening', on); },
+  /** Small live caption under the question: what the recogniser is hearing right now. */
+  live(text){
+    const el = $('#heardLive'); if (!el) return;
+    if (text === null){ el.textContent = ''; el.classList.remove('on'); return; }
+    el.textContent = text ? `🎤 "${normSpoken(text)}"` : '🎤 listening…';
+    el.classList.add('on');
+  }
 };
+/* Pepper never listens to herself: pause the mic while she talks, listen again when she stops. */
+{
+  const say = Voice.say;
+  Voice.say = (text, opts = {}) => {
+    Listen.hold();
+    const onend = opts.onend; let ended = false;
+    say(text, { ...opts, onend: () => { onend && onend(); if (!ended){ ended = true; Listen.release(); } } });
+  };
+}
+
+/* ---- Spoken-answer matching ----
+   Children's single words are often misheard ("cat" → "cut", "kat"), so an option scores:
+   1.0 exact word or phrase · 0.8 sounds alike (same consonant skeleton) · 0.6 one letter off.
+   The best option wins only if it is clearly ahead of the others; otherwise Pepper asks again. */
+const normSpoken = s => String(s).toLowerCase()
+  .replace(/\b0\b/g, ' oh ').replace(/\b8\b/g, ' eight ')
+  .replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+const FILLER = new Set(['the', 'and', 'its', 'this', 'that', 'what', 'yes', 'say', 'said', 'word', 'letter', 'answer', 'is', 'it', 'i', 'think']);
+function soundKey(w){
+  let s = w.toLowerCase().replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/qu/g, 'kw').replace(/x/g, 'ks')
+    .replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k').replace(/q/g, 'k').replace(/e$/, '');
+  const first = s[0];
+  s = s.replace(/[aeiouyhw]/g, '')
+    .replace(/[db]/g, m => (m === 'd' ? 't' : 'p')).replace(/g/g, 'k').replace(/z/g, 's').replace(/v/g, 'f')
+    .replace(/(.)\1+/g, '$1');
+  return (/[aeiou]/.test(first) ? 'a' : '') + s;
+}
+function editDist(a, b){
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function wordScore(heardWord, target){
+  if (heardWord === target) return 1;
+  if (heardWord.length < 3 || target.length < 3 || FILLER.has(heardWord)) return 0;
+  if (soundKey(heardWord) === soundKey(target)) return 0.8;
+  if (heardWord[0] === target[0] && editDist(heardWord, target) === 1) return 0.6;
+  return 0;
+}
+const ALIAS = {   // extra ways speech recognition writes common answers
+  a: ['ay', 'eh', 'hey', 'ei', 'eight', 'hay'], e: ['ee', 'he'], i: ['eye', 'aye', 'hi'], o: ['oh', 'owe', 'ow'], u: ['you', 'yu', 'ewe', 'yo'],
+  cat: ['kat', 'cats', 'kitty'], cap: ['caps', 'kap'], dog: ['dogs', 'doug'], hat: ['hats'], sun: ['son', 'sunny']
+};
+function optionWords(opt){
+  const base = [opt.label, ...(opt.say || [])].filter(Boolean).map(w => normSpoken(w)).filter(Boolean);
+  const extra = base.flatMap(w => ALIAS[w] || []);
+  return [...new Set([...base, ...extra])];
+}
+function matchSpoken(q, input){
+  const alts = (Array.isArray(input) ? input : [input]).map(normSpoken).filter(Boolean);
+  // words from the question itself ("rhymes with CAT", "the BALL is under…") never count as sound-alikes
+  const inQuestion = new Set(normSpoken(`${q.prompt || ''} ${q.say || ''}`).split(' '));
+  const scores = lettersOf(q).map(l => {
+    const words = optionWords(q.options[l]);
+    let best = 0;
+    alts.forEach((alt, ai) => {
+      const weight = ai === 0 ? 1 : 0.95;               // later alternatives are the recogniser's second guesses
+      const toks = alt.split(' ');
+      for (const w of words){
+        if (w.includes(' ') ? (' ' + alt + ' ').includes(' ' + w + ' ') : toks.includes(w)) best = Math.max(best, weight);
+        else for (const t of toks) if (!inQuestion.has(t)) best = Math.max(best, wordScore(t, w) * weight);
+      }
+    });
+    return { letter: l, score: best };
+  }).sort((a, b) => b.score - a.score);
+  const [top, second] = scores;
+  if (!top || top.score < 0.6) return { letter: null, score: 0 };
+  if (second && top.score - second.score < 0.15) return { letter: null, score: top.score, tie: [top.letter, second.letter] };
+  return top;
+}
+function accept(q, letter){
+  const opt = q.options[letter];
+  Bubble.show(`I heard "${opt.label || opt.alt || letter}"!`);
+  const tk = state.token;
+  setTimeout(() => { if (tk === state.token) choose(letter); }, 650);
+}
 /** Match spoken text (string or list of alternatives) to an option. Never counts as wrong if nothing matches. */
 function heard(input){
   const q = current();
   if (!q || state.phase !== 'question' || q.type === 'build') return false;
-  const alts = (Array.isArray(input) ? input : [input])
-    .map(s => String(s).toLowerCase().replace(/[^a-z\s]/g, ' ').trim()).filter(Boolean);
-  for (const l of lettersOf(q)){
-    const opt = q.options[l];
-    const words = [opt.label, ...(opt.say || [])].filter(Boolean).map(w => String(w).toLowerCase());
-    if (alts.some(a => words.includes(a) || a.split(/\s+/).some(t => words.includes(t)))){
-      Bubble.show(`I heard "${opt.label}"!`);
-      const tk = state.token;
-      setTimeout(() => { if (tk === state.token) choose(l); }, 650);
-      return true;
-    }
-  }
-  notHeard();
+  const m = matchSpoken(q, input);
+  if (m.letter){ accept(q, m.letter); return true; }
+  notHeard(Array.isArray(input) ? input[0] : input, m.tie);
   return false;
 }
-function notHeard(){
+function notHeard(text, tie){
   state.unheard = (state.unheard || 0) + 1;
-  const line = state.unheard < 2 ? "I didn't catch that. Can you say it again?" : 'Tap the letter you said!';
-  Pepper.set('thinking'); Bubble.show(line); Voice.say(line);
+  const q = current(), shown = text ? normSpoken(text) : '';
+  let line;
+  if (tie && q){ const n = l => q.options[l].label || q.options[l].alt || l; line = `Did you say ${n(tie[0])} or ${n(tie[1])}? Tap it!`; }
+  else line = state.unheard < 2 ? "I didn't catch that. Can you say it again?" : 'Tap the letter you said!';
+  Pepper.set('thinking');
+  Bubble.show(shown ? `I heard "${shown}". ${line}` : line);
+  Voice.say(line);
 }
 
 function showQuestion(){
   const tk = state.token, q = current();
   if (!q) return;
   state.phase = 'question'; state.attempts = 0; state.unheard = 0;
-  renderQuestion(q); lock(false); Bubble.hide();
+  Listen.newQuestion(); renderQuestion(q); lock(false); Bubble.hide();
   Pepper.set('thinking');
   setTimeout(() => { if (tk === state.token && state.phase === 'question' && Pepper.state === 'thinking') Pepper.set('idle'); }, 1900);
   if (state.settings.autoRead) setTimeout(() => { if (tk === state.token && state.phase === 'question') readQuestion(true); }, 450);
+  else Listen.soon(900);
   Timer.start();
   emit('onQuestion', q, state.step);
   updateStatus();
@@ -2146,6 +2275,7 @@ function loadBank(id){
 window.PepperGame = {
   answer: l => choose(String(l).toUpperCase()),
   heard: text => heard(text),          // spoken word(s) from Pepper's ASR
+  match: (text, q = current()) => matchSpoken(q, text),   // test what a spoken phrase would choose
   forward: manualForward, back: manualBack,
   reset: () => resetGame('greet'),
   setBank: id => { if (BANKS[id]){ loadBank(id); resetGame('greet'); } },
@@ -2166,7 +2296,7 @@ function updateStatus(){
 }
 function syncControls(){
   const s = state.settings;
-  $('#tSfx').checked = s.sfx; $('#tVoice').checked = s.voice; $('#tAuto').checked = s.autoRead;
+  $('#tSfx').checked = s.sfx; $('#tVoice').checked = s.voice; $('#tAuto').checked = s.autoRead; $('#tListen').checked = s.autoListen;
   $$('#tTimer button').forEach(b => b.classList.toggle('on', +b.dataset.v === +s.timer));
   $('#tBank').value = s.bank;
   const on = s.sfx || s.voice;
@@ -2192,7 +2322,7 @@ function bindUI(){
     const t = e.target.closest('.tile'); if (t) return placeTile(+t.dataset.i);
     if (e.target.closest('.undo')) undoTile();
   });
-  $('#micBtn').addEventListener('click', () => { Sfx.unlock(); Listen.start(); });
+  $('#micBtn').addEventListener('click', () => { Sfx.unlock(); Listen.start(false); });
 
   $('#muteBtn').addEventListener('click', () => {
     const on = !(state.settings.sfx || state.settings.voice);
@@ -2210,6 +2340,7 @@ function bindUI(){
   $('#tSfx').addEventListener('change', e => { state.settings.sfx = e.target.checked; saveSettings(); syncControls(); });
   $('#tVoice').addEventListener('change', e => { state.settings.voice = e.target.checked; if (!e.target.checked) Voice.stop(); saveSettings(); syncControls(); });
   $('#tAuto').addEventListener('change', e => { state.settings.autoRead = e.target.checked; saveSettings(); });
+  $('#tListen').addEventListener('change', e => { state.settings.autoListen = e.target.checked; saveSettings(); if (e.target.checked) Listen.soon(); else Listen.stop(); });
   $$('#tTimer button').forEach(b => b.addEventListener('click', () => {
     state.settings.timer = +b.dataset.v; saveSettings(); syncControls();
     if (state.phase === 'question') Timer.start(); else Timer.el.classList.toggle('hidden', !state.settings.timer);
@@ -2244,7 +2375,7 @@ function bindUI(){
     const pick = { a: 'A', b: 'B', c: 'C', arrowleft: 'A', arrowright: ls[ls.length - 1], arrowdown: ls.length === 3 ? 'B' : null, arrowup: ls.length === 3 ? 'B' : null }[k];
     if (pick){ Sfx.unlock(); flash(pick); choose(pick); }
     else if (k === 'r') readQuestion(false);
-    else if (k === 'm'){ Sfx.unlock(); Listen.start(); }
+    else if (k === 'm'){ Sfx.unlock(); Listen.start(false); }
     else if ((k === 'enter' || k === ' ') && state.phase === 'intro'){ e.preventDefault(); Sfx.unlock(); greet(); }
   });
 }

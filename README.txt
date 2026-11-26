@@ -34,6 +34,10 @@ The design/ folder contains the character design page (character-design.html) an
    The first time, Chrome asks to use the microphone: click Allow.
    Children can then say the answer (for example "cat", "hat", "under the table")
    on every question except "Build the word".
+   The microphone opens by itself after Pepper finishes speaking ("Listen automatically"
+   in the teacher panel). It pauses while Pepper talks. Under the question you can see
+   what the computer heard (🎤 "..."). Tapping the microphone button stops or starts it.
+   Close-sounding words also count ("cut" → CAT, "son" → SUN).
 Note: the link is public. Anyone who has it can open the game.
 Note: the console shows one missing file, /libs/qimessaging/... That file only exists
       on the robot, so this is normal.
